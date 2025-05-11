@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARTICX</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #121212, #050505);
+      color: #cccccc;
+      font-family: 'Inter', sans-serif;
+      position: relative;
+      width: 100%;
+      height: 100vh;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .title {
+      font-size: 3.2em;
+      font-weight: 800;
+      text-align: center;
+      background: linear-gradient(45deg, #4a90e2, #0056b3, #4a90e2);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientShift 10s linear infinite;
+      z-index: 10;
+      padding: 10px 25px;
+      border-radius: 8px;
+      letter-spacing: -0.5px;
+      user-select: none;
+      text-shadow: 0 0 10px rgba(0, 86, 179, 0.5);
+    }
+
+    @keyframes gradientShift {
+      0% {
+        background-position: 0% center;
+      }
+
+      100% {
+        background-position: 200% center;
+      }
+    }
+
+    .tip {
+      position: absolute;
+      background-color: rgba(50, 50, 50, 0.7);
+      border: 1px solid rgba(100, 100, 100, 0.5);
+      backdrop-filter: blur(2px);
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-size: 0.9em;
+      font-weight: 400;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+      z-index: 5;
+      white-space: nowrap;
+      transform: scale(0.95);
+      cursor: grab;
+      user-select: none;
+      top: 0;
+      left: 0;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .tip.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .tip.dragging {
+      cursor: grabbing;
+      z-index: 15;
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="particleCanvas"></canvas>
+
+  <h1 class="title" id="mainTitle">Strength and Resolve</h1>
+
+  <script>
+    const canvas = document.getElementById('particleCanvas');
+    const ctx = canvas.getContext('2d');
+    const titleElement = document.getElementById('mainTitle');
+    const tips = [
+      "Embrace challenges.",
+      "Learn from setbacks.",
+      "Stay disciplined.",
+      "Take decisive action.",
+      "Build resilience.",
+      "Focus on progress.",
+      "Seek knowledge.",
+      "Lead by example.",
+      "Maintain integrity.",
+      "Overcome obstacles.",
+      "Stay true to your word.",
+      "Develop your skills.",
+      "Face your fears.",
+      "Strive for excellence.",
+      "Be accountable."
+    ];
+
+    let activeTip = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    const particles = [];
+    const particleCount = 120;
+    const particleSize = 1.8;
+    const particleSpeed = 0.6;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function createParticles() {
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: particleSize,
+          speedX: (Math.random() - 0.5) * particleSpeed,
+          speedY: (Math.random() - 0.5) * particleSpeed,
+          opacity: Math.random() * 0.6 + 0.2
+        });
+      }
+    }
+
+    function updateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(150, 150, 150, 0.7)';
+      ctx.beginPath();
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        p.x += p.speedX;
+        p.y += p.speedY;
+
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+
+        ctx.globalAlpha = p.opacity;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      }
+
+      ctx.fill();
+    }
+
+    function animateParticles() {
+      updateParticles();
+      requestAnimationFrame(animateParticles);
+    }
+
+    createParticles();
+    animateParticles();
+
+    function isColliding(element1, element2, padding = 0) {
+      const rect1 = element1.getBoundingClientRect();
+      const rect2 = element2.getBoundingClientRect();
+
+      return !(rect1.right + padding < rect2.left - padding ||
+        rect1.left - padding > rect2.right + padding ||
+        rect1.bottom + padding < rect2.top - padding ||
+        rect1.top > rect2.bottom + padding);
+    }
+
+    function dragStart(e) {
+      if (!e.target.classList.contains('tip')) return;
+
+      e.preventDefault();
+
+      activeTip = e.target;
+      activeTip.classList.add('dragging');
+
+      const clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+
+      const tipRect = activeTip.getBoundingClientRect();
+      dragOffsetX = clientX - tipRect.left;
+      dragOffsetY = clientY - tipRect.top;
+    }
+
+    function dragEnd(e) {
+      if (activeTip) {
+        activeTip.classList.remove('dragging');
+        activeTip = null;
+      }
+    }
+
+    function drag(e) {
+      if (activeTip) {
+        e.preventDefault();
+
+        const clientX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+
+        let newX = clientX - dragOffsetX;
+        let newY = clientY - dragOffsetY;
+
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const tipWidth = activeTip.offsetWidth;
+        const tipHeight = activeTip.offsetHeight;
+        const margin = 10;
+
+        newX = Math.max(margin, Math.min(newX, viewportWidth - tipWidth - margin));
+        newY = Math.max(margin, Math.min(newY, viewportHeight - tipHeight - margin));
+
+        activeTip.style.left = `${newX}px`;
+        activeTip.style.top = `${newY}px`;
+      }
+    }
+
+    document.addEventListener("touchstart", dragStart, false);
+    document.addEventListener("touchend", dragEnd, false);
+    document.addEventListener("touchmove", drag, false);
+
+    document.addEventListener("mousedown", dragStart, false);
+    document.addEventListener("mouseup", dragEnd, false);
+    document.addEventListener("mousemove", drag, false);
+
+    function showRandomTip() {
+      const randomTipText = tips[Math.floor(Math.random() * tips.length)];
+      const tipElement = document.createElement('div');
+      tipElement.classList.add('tip');
+      tipElement.textContent = randomTipText;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 30;
+      const collisionPadding = 20;
+
+      let attempts = 0;
+      const maxAttempts = 300;
+
+      while (attempts < maxAttempts) {
+        const randomX = Math.random() * (viewportWidth - tipElement.offsetWidth - 2 * margin) + margin;
+        const randomY = Math.random() * (viewportHeight - tipElement.offsetHeight - 2 * margin) + margin;
+
+        tipElement.style.left = `${randomX}px`;
+        tipElement.style.top = `${randomY}px`;
+
+        let collisionDetected = false;
+
+        if (isColliding(tipElement, titleElement, collisionPadding)) {
+          collisionDetected = true;
+        }
+        else {
+          const existingTips = document.querySelectorAll('.tip');
+          for (const existingTip of existingTips) {
+            if (existingTip !== tipElement && isColliding(tipElement, existingTip, collisionPadding)) {
+              collisionDetected = true;
+              break;
+            }
+          }
+        }
+
+        if (!collisionDetected) {
+          document.body.appendChild(tipElement);
+
+          requestAnimationFrame(() => {
+            tipElement.classList.add('show');
+          });
+
+          setTimeout(() => {
+            tipElement.classList.remove('show');
+            tipElement.addEventListener('transitionend', () => {
+              tipElement.remove();
+            }, {once: true});
+          }, 5000);
+
+          return;
+        }
+
+        attempts++;
+      }
+
+      console.warn("Could not find a non-colliding position for the tip after maximum attempts.");
+    }
+
+    setInterval(showRandomTip, 2500);
+
+    showRandomTip();
+  </script>
+
+</body>
+
+</html>
